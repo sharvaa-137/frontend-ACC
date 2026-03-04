@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Company } from '~/types'
+import type { Company, BankInfo } from '~/types'
 
 const { getAllCompanies, createCompany, updateCompany, deleteCompany } = useCompanies()
 const toast = useToast()
@@ -13,11 +13,18 @@ const searchQuery = ref('')
 const form = ref({
   name: '',
   registrationNumber: '',
-  bankName: '',
-  bankAccount: '',
+  banks: [{ bankName: '', bankAccount: '' }] as BankInfo[],
   contactPerson: '',
   contactInfo: ''
 })
+
+const addBank = () => {
+  form.value.banks.push({ bankName: '', bankAccount: '' })
+}
+
+const removeBank = (index: number) => {
+  form.value.banks.splice(index, 1)
+}
 
 const filteredCompanies = computed(() => {
   if (!searchQuery.value) return companies.value
@@ -25,7 +32,7 @@ const filteredCompanies = computed(() => {
   return companies.value.filter(c =>
     c.name.toLowerCase().includes(q) ||
     (c.registrationNumber && c.registrationNumber.includes(q)) ||
-    (c.bankAccount && c.bankAccount.includes(q))
+    (c.banks && c.banks.some(b => b.bankAccount && b.bankAccount.includes(q)))
   )
 })
 
@@ -45,8 +52,7 @@ const openCreate = () => {
   form.value = {
     name: '',
     registrationNumber: '',
-    bankName: '',
-    bankAccount: '',
+    banks: [{ bankName: '', bankAccount: '' }],
     contactPerson: '',
     contactInfo: ''
   }
@@ -58,8 +64,9 @@ const openEdit = (company: Company) => {
   form.value = {
     name: company.name,
     registrationNumber: company.registrationNumber || '',
-    bankName: company.bankName || '',
-    bankAccount: company.bankAccount || '',
+    banks: company.banks && company.banks.length > 0
+      ? company.banks.map(b => ({ bankName: b.bankName || '', bankAccount: b.bankAccount || '' }))
+      : [{ bankName: '', bankAccount: '' }],
     contactPerson: company.contactPerson || '',
     contactInfo: company.contactInfo || ''
   }
@@ -68,11 +75,15 @@ const openEdit = (company: Company) => {
 
 const saveCompany = async () => {
   try {
+    // Filter out empty bank entries
+    const cleanedBanks = form.value.banks.filter(b => b.bankName || b.bankAccount)
+    const payload = { ...form.value, banks: cleanedBanks }
+
     if (editingCompany.value) {
-      await updateCompany(editingCompany.value._id, form.value)
+      await updateCompany(editingCompany.value._id, payload)
       toast.add({ title: 'Амжилттай', description: 'Компани шинэчлэгдлээ', color: 'success' })
     } else {
-      await createCompany(form.value)
+      await createCompany(payload)
       toast.add({ title: 'Амжилттай', description: 'Компани нэмэгдлээ', color: 'success' })
     }
     showModal.value = false
@@ -142,7 +153,7 @@ onMounted(() => {
               { accessorKey: 'index', header: '№' },
               { accessorKey: 'name', header: 'Компанийн нэр' },
               { accessorKey: 'registrationNumber', header: 'Регистрийн дугаар' },
-              { accessorFn: (row: any) => row.bankName && row.bankAccount ? `${row.bankName} - ${row.bankAccount}` : '-', header: 'Банк, данс', id: 'bankInfo' },
+              { accessorFn: (row: any) => row.banks && row.banks.length > 0 ? row.banks.map((b: any) => `${b.bankName} - ${b.bankAccount}`).join(' | ') : '-', header: 'Банк, данс', id: 'bankInfo' },
               { accessorFn: (row: any) => row.contactPerson ? `${row.contactPerson}${row.contactInfo ? ' - ' + row.contactInfo : ''}` : '-', header: 'ХТ', id: 'contact' },
               { accessorKey: 'actions', header: 'Үйлдэл' }
             ]"
@@ -193,16 +204,27 @@ onMounted(() => {
                 <label class="text-sm font-medium text-muted mb-1 block">Регистрийн дугаар</label>
                 <UInput v-model="form.registrationNumber" placeholder="Регистрийн дугаар" />
               </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="text-sm font-medium text-muted mb-1 block">Банкны нэр</label>
-                  <UInput v-model="form.bankName" placeholder="Жнь: Хаан" />
+
+              <!-- Multi-Bank Section -->
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="text-sm font-medium text-muted">Банкны данснууд</label>
+                  <UButton icon="i-lucide-plus" size="xs" variant="outline" color="neutral" label="Данс нэмэх" @click="addBank" />
                 </div>
-                <div>
-                  <label class="text-sm font-medium text-muted mb-1 block">Дансны дугаар</label>
-                  <UInput v-model="form.bankAccount" placeholder="Дансны дугаар" />
+                <div v-for="(bank, idx) in form.banks" :key="idx" class="grid grid-cols-[1fr_1fr_auto] gap-2 mb-2">
+                  <UInput v-model="bank.bankName" placeholder="Банкны нэр" />
+                  <UInput v-model="bank.bankAccount" placeholder="Дансны дугаар" />
+                  <UButton
+                    v-if="form.banks.length > 1"
+                    icon="i-lucide-x"
+                    color="error"
+                    variant="ghost"
+                    size="xs"
+                    @click="removeBank(idx)"
+                  />
                 </div>
               </div>
+
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="text-sm font-medium text-muted mb-1 block">Холбоо барих хүн</label>

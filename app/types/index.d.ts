@@ -1,9 +1,13 @@
+export interface BankInfo {
+  bankName: string
+  bankAccount: string
+}
+
 export interface Company {
   _id: string
   name: string
   registrationNumber: string
-  bankName: string
-  bankAccount: string
+  banks: BankInfo[]
   contactPerson: string
   contactInfo: string
   createdAt: string
@@ -14,6 +18,8 @@ export interface Transaction {
   companyId: Company
   amount: number
   transactionDate: string
+  bankName: string
+  bankAccount: string
   contactInfo: string
   notes: string
   createdAt: string

@@ -169,7 +169,7 @@ const loadReport = async () => {
   try {
     const params: Record<string, string> = { type: reportType.value }
     switch (reportType.value) {
-      case 'day': params.date = selectedDate.value; break
+      case 'day': params.date = selectedDate.value || ''; break
       case 'month': params.year = String(selectedYear.value); params.month = String(selectedMonth.value); break
       case 'quarter': params.year = String(selectedYear.value); params.quarter = String(selectedQuarter.value); break
       case 'year': params.year = String(selectedYear.value); break
@@ -191,7 +191,7 @@ const exportCSV = () => {
     formatDateTime(t.createdAt),
     t.companyId?.name || '',
     t.companyId?.registrationNumber || '',
-    t.companyId?.bankName && t.companyId?.bankAccount ? `${t.companyId.bankName} - ${t.companyId.bankAccount}` : '',
+    t.bankName && t.bankAccount ? `${t.bankName} - ${t.bankAccount}` : '',
     t.amount,
     t.contactInfo || t.companyId?.contactPerson || ''
   ])
@@ -394,7 +394,7 @@ onMounted(() => loadReport())
                 { accessorFn: (row: any) => formatDateTime(row.createdAt), header: 'Огноо, цаг', id: 'datetime' },
                 { accessorFn: (row: any) => row.companyId?.name || '-', header: 'Хүлээн авагч', id: 'companyName' },
                 { accessorFn: (row: any) => row.companyId?.registrationNumber || '-', header: 'Регистр', id: 'regNum' },
-                { accessorFn: (row: any) => row.companyId?.bankName && row.companyId?.bankAccount ? `${row.companyId.bankName} - ${row.companyId.bankAccount}` : '-', header: 'Банк, данс', id: 'bankInfo' },
+                { accessorFn: (row: any) => row.bankName && row.bankAccount ? `${row.bankName} - ${row.bankAccount}` : '-', header: 'Банк, данс', id: 'bankInfo' },
                 { accessorKey: 'amount', header: 'Мөнгөн дүн' },
                 { accessorFn: (row: any) => row.contactInfo || (row.companyId?.contactPerson ? `${row.companyId.contactPerson}${row.companyId.contactInfo ? ' - ' + row.companyId.contactInfo : ''}` : '-'), header: 'ХТ', id: 'contact' }
               ]"

@@ -33,10 +33,43 @@ const amount = ref<number | null>(null)
 const contactInfo = ref('')
 const notes = ref('')
 
-// Contact info suggestions from selected company
-const contactSuggestions = ref<string[]>([])
-const showContactDropdown = ref(false)
-const contactSearch = ref('')
+// Bank selection
+const selectedBankIndex = ref<number | null>(null)
+const customBankName = ref('')
+const customBankAccount = ref('')
+const showBankDropdown = ref(false)
+const bankMode = ref<'select' | 'custom'>('select')
+
+const bankOptions = computed(() => {
+  if (!selectedCompany.value) return []
+  const opts: { label: string, bankName: string, bankAccount: string }[] = []
+  // Cash option first
+  opts.push({ label: 'Бэлэнээр', bankName: 'Бэлэнээр', bankAccount: '' })
+  // Company's banks
+  for (const b of selectedCompany.value.banks || []) {
+    if (b.bankName || b.bankAccount) {
+      opts.push({
+        label: `${b.bankName || ''} - ${b.bankAccount || ''}`,
+        bankName: b.bankName || '',
+        bankAccount: b.bankAccount || ''
+      })
+    }
+  }
+  return opts
+})
+
+const selectedBankLabel = computed(() => {
+  if (bankMode.value === 'custom') {
+    if (customBankName.value || customBankAccount.value) {
+      return `${customBankName.value} - ${customBankAccount.value}`
+    }
+    return 'Шинэ данс оруулах'
+  }
+  if (selectedBankIndex.value !== null && bankOptions.value[selectedBankIndex.value]) {
+    return bankOptions.value[selectedBankIndex.value].label
+  }
+  return 'Банк / Бэлэнээр сонгох'
+})
 
 // Transactions list
 const transactions = ref<Transaction[]>([])
@@ -57,12 +90,7 @@ const totalAmount = computed(() => {
   return transactions.value.reduce((sum, t) => sum + t.amount, 0)
 })
 
-// Filter contact suggestions
-const filteredContactSuggestions = computed(() => {
-  if (!contactSearch.value) return contactSuggestions.value
-  const q = contactSearch.value.toLowerCase()
-  return contactSuggestions.value.filter(s => s.toLowerCase().includes(q))
-})
+const filteredContactSuggestions = computed(() => [] as string[])
 
 // Debounced company search
 let searchTimeout: ReturnType<typeof setTimeout>
@@ -94,19 +122,16 @@ const selectCompany = (company: Company) => {
   companySearch.value = company.name
   showDropdown.value = false
 
-  // Build contact suggestions from company data
-  const suggestions: string[] = []
-  if (company.contactPerson) {
-    const base = company.contactPerson
-    if (company.contactInfo) {
-      suggestions.push(`${base} - ${company.contactInfo}`)
-    }
-    suggestions.push(base)
+  // Reset bank selection
+  selectedBankIndex.value = null
+  customBankName.value = ''
+  customBankAccount.value = ''
+  bankMode.value = 'select'
+
+  // Auto-select first bank if company has one
+  if (company.banks && company.banks.length > 0) {
+    selectedBankIndex.value = 1 // index 0 is cash, 1 is first bank
   }
-  if (company.contactInfo && !suggestions.some(s => s === company.contactInfo)) {
-    suggestions.push(company.contactInfo)
-  }
-  contactSuggestions.value = suggestions
 
   // Auto-fill contactInfo with company's default
   if (company.contactPerson) {
@@ -116,9 +141,16 @@ const selectCompany = (company: Company) => {
   }
 }
 
-const selectContactSuggestion = (suggestion: string) => {
-  contactInfo.value = suggestion
-  showContactDropdown.value = false
+const selectBank = (index: number) => {
+  selectedBankIndex.value = index
+  bankMode.value = 'select'
+  showBankDropdown.value = false
+}
+
+const switchToCustomBank = () => {
+  bankMode.value = 'custom'
+  selectedBankIndex.value = null
+  showBankDropdown.value = false
 }
 
 const clearSelection = () => {
@@ -130,8 +162,11 @@ const clearSelection = () => {
   showDropdown.value = false
   amount.value = null
   contactInfo.value = ''
-  contactSuggestions.value = []
   notes.value = ''
+  selectedBankIndex.value = null
+  customBankName.value = ''
+  customBankAccount.value = ''
+  bankMode.value = 'select'
 }
 
 const submitTransaction = async () => {
@@ -144,11 +179,24 @@ const submitTransaction = async () => {
     return
   }
 
+  // Resolve bank info
+  let txBankName = ''
+  let txBankAccount = ''
+  if (bankMode.value === 'custom') {
+    txBankName = customBankName.value
+    txBankAccount = customBankAccount.value
+  } else if (selectedBankIndex.value !== null && bankOptions.value[selectedBankIndex.value]) {
+    txBankName = bankOptions.value[selectedBankIndex.value].bankName
+    txBankAccount = bankOptions.value[selectedBankIndex.value].bankAccount
+  }
+
   try {
     await createTransaction({
       companyId: selectedCompany.value._id,
       amount: amount.value,
       transactionDate: selectedDate.value,
+      bankName: txBankName || undefined,
+      bankAccount: txBankAccount || undefined,
       contactInfo: contactInfo.value || undefined,
       notes: notes.value || undefined
     })
@@ -283,8 +331,11 @@ onMounted(() => {
                         <span v-if="company.registrationNumber" class="flex items-center gap-1">
                       <UIcon name="i-lucide-hash" class="size-3" /> {{ company.registrationNumber }}
                         </span>
-                        <span v-if="company.bankAccount" class="flex items-center gap-1">
-                      <UIcon name="i-lucide-landmark" class="size-3" /> {{ company.bankName }} - {{ company.bankAccount }}
+                        <span v-if="company.banks && company.banks.length > 0" class="flex items-center gap-1">
+                      <UIcon name="i-lucide-landmark" class="size-3" />
+                      <span v-for="(b, bi) in company.banks" :key="bi">
+                        {{ b.bankName }} - {{ b.bankAccount }}<span v-if="bi < company.banks.length - 1"> | </span>
+                      </span>
                     </span>
                         <span v-if="company.contactPerson" class="flex items-center gap-1">
                       <UIcon name="i-lucide-user" class="size-3" /> {{ company.contactPerson }}
@@ -307,9 +358,11 @@ onMounted(() => {
                           <span class="text-muted">Регистр:</span>
                           <span class="font-semibold ml-1">{{ selectedCompany.registrationNumber }}</span>
                         </div>
-                        <div v-if="selectedCompany.bankAccount">
+                        <div v-if="selectedCompany.banks && selectedCompany.banks.length > 0">
                           <span class="text-muted">Банк:</span>
-                          <span class="font-semibold ml-1">{{ selectedCompany.bankName }} - {{ selectedCompany.bankAccount }}</span>
+                          <span v-for="(b, bi) in selectedCompany.banks" :key="bi" class="font-semibold ml-1">
+                            {{ b.bankName }} - {{ b.bankAccount }}<span v-if="bi < selectedCompany.banks.length - 1" class="text-muted"> | </span>
+                          </span>
                         </div>
                         <div v-if="selectedCompany.contactPerson">
                           <span class="text-muted">ХТ:</span>
@@ -347,35 +400,65 @@ onMounted(() => {
                     />
                   </div>
 
-                  <!-- Contact Info -->
+                  <!-- Bank Selector -->
                   <div class="relative flex flex-col gap-1.5">
+                    <label class="text-sm font-medium text-muted">Банк / Данс</label>
+                    <button
+                      type="button"
+                      class="w-full text-left px-4 py-3 rounded-xl border border-default bg-default/50 text-sm flex items-center justify-between gap-2 hover:bg-elevated/30 transition-colors"
+                      @click="showBankDropdown = !showBankDropdown"
+                      @blur="globalThis.setTimeout(() => showBankDropdown = false, 200)"
+                    >
+                      <span class="flex items-center gap-2 truncate">
+                        <UIcon name="i-lucide-landmark" class="size-4 text-muted shrink-0" />
+                        <span :class="selectedBankIndex !== null || bankMode === 'custom' ? '' : 'text-muted'">{{ selectedBankLabel }}</span>
+                      </span>
+                      <UIcon name="i-lucide-chevron-down" class="size-4 text-muted shrink-0" />
+                    </button>
+                    <div
+                      v-if="showBankDropdown && bankOptions.length > 0"
+                      class="absolute z-50 top-full mt-1 w-full rounded-xl border border-default bg-default shadow-2xl max-h-52 overflow-y-auto"
+                    >
+                      <button
+                        v-for="(opt, idx) in bankOptions"
+                        :key="idx"
+                        class="w-full text-left px-5 py-3 hover:bg-elevated/50 transition-colors border-b border-default last:border-b-0 text-sm flex items-center gap-2"
+                        @mousedown.prevent="selectBank(idx)"
+                      >
+                        <UIcon :name="idx === 0 ? 'i-lucide-banknote' : 'i-lucide-landmark'" class="size-4 text-primary shrink-0" />
+                        {{ opt.label }}
+                      </button>
+                      <button
+                        class="w-full text-left px-5 py-3 hover:bg-elevated/50 transition-colors text-sm flex items-center gap-2 text-primary"
+                        @mousedown.prevent="switchToCustomBank"
+                      >
+                        <UIcon name="i-lucide-plus" class="size-4 shrink-0" />
+                        Шинэ данс оруулах
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Custom Bank Fields (shown when custom mode) -->
+                  <template v-if="bankMode === 'custom'">
+                    <div class="flex flex-col gap-1.5">
+                      <label class="text-sm font-medium text-muted">Банкны нэр</label>
+                      <UInput v-model="customBankName" placeholder="Жнь: Хаан банк" size="xl" icon="i-lucide-landmark" />
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                      <label class="text-sm font-medium text-muted">Дансны дугаар</label>
+                      <UInput v-model="customBankAccount" placeholder="Дансны дугаар" size="xl" icon="i-lucide-hash" />
+                    </div>
+                  </template>
+
+                  <!-- Contact Info -->
+                  <div class="flex flex-col gap-1.5">
                     <label class="text-sm font-medium text-muted">ХТ (Холбоо барих)</label>
                     <UInput
                       v-model="contactInfo"
                       placeholder="Нэр - утасны дугаар"
                       icon="i-lucide-contact"
                       size="xl"
-                      @focus="showContactDropdown = contactSuggestions.length > 0"
-                      @blur="setTimeout(() => showContactDropdown = false, 200)"
-                      @input="contactSearch = ($event.target as HTMLInputElement).value"
                     />
-                    <div
-                      v-if="showContactDropdown && filteredContactSuggestions.length > 0"
-                      class="absolute z-50 top-full mt-1 w-full rounded-xl border border-default bg-default shadow-2xl max-h-52 overflow-y-auto"
-                    >
-                      <div class="px-4 py-2 text-xs font-semibold text-muted border-b border-default bg-elevated/30">
-                        Компанийн мэдээллээс сонгох
-                      </div>
-                      <button
-                        v-for="(suggestion, idx) in filteredContactSuggestions"
-                        :key="idx"
-                        class="w-full text-left px-5 py-3 hover:bg-elevated/50 transition-colors border-b border-default last:border-b-0 text-sm"
-                        @mousedown.prevent="selectContactSuggestion(suggestion)"
-                      >
-                        <UIcon name="i-lucide-user-check" class="size-4 inline mr-2 text-primary" />
-                        {{ suggestion }}
-                      </button>
-                    </div>
                   </div>
 
                   <!-- Notes -->
@@ -450,7 +533,7 @@ onMounted(() => {
           { accessorKey: 'index', header: '№' },
           { accessorFn: (row: any) => row.companyId?.name || '-', header: 'Хүлээн авагч', id: 'companyName' },
           { accessorFn: (row: any) => row.companyId?.registrationNumber || '-', header: 'Регистрийн дугаар', id: 'regNumber' },
-          { accessorFn: (row: any) => row.companyId?.bankName && row.companyId?.bankAccount ? `${row.companyId.bankName} - ${row.companyId.bankAccount}` : '-', header: 'Банкны нэр болон данс', id: 'bankInfo' },
+          { accessorFn: (row: any) => row.bankName ? (row.bankAccount ? `${row.bankName} - ${row.bankAccount}` : row.bankName) : '-', header: 'Банкны нэр болон данс', id: 'bankInfo' },
           { accessorKey: 'amount', header: 'Мөнгөн дүн' },
           { accessorFn: (row: any) => row.contactInfo || (row.companyId?.contactPerson ? `${row.companyId.contactPerson}${row.companyId.contactInfo ? ' - ' + row.companyId.contactInfo : ''}` : '-'), header: 'ХТ', id: 'contact' },
           { accessorKey: 'actions', header: '' }
