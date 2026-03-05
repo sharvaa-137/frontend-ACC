@@ -67,9 +67,9 @@ const groups = computed(() => [{
       :ui="{ footer: 'lg:border-t lg:border-default' }"
     >
       <template #header="{ collapsed }">
-        <div class="flex items-center gap-2 p-2">
-          <UIcon name="i-lucide-calculator" class="size-6 text-primary shrink-0" />
-          <span v-if="!collapsed" class="font-bold text-sm truncate">НЯ-БО Бүртгэл</span>
+        <div class="flex items-center gap-2 p-2 relative h-10">
+          <img src="/logo.svg" alt="Balance" class="size-7 shrink-0 object-contain drop-shadow-md" />
+          <span v-if="!collapsed" class="font-extrabold text-xl tracking-tighter bg-gradient-to-r from-primary to-indigo-500 bg-clip-text text-transparent drop-shadow-sm ml-1">Balance</span>
         </div>
       </template>
 

@@ -1,0 +1,23 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .p { fill: url(#grad1); }
+    .s1 { fill: #0F172A; }
+    .s2 { fill: #334155; }
+    @media (prefers-color-scheme: dark) {
+      .s1 { fill: #FFFFFF; }
+      .s2 { fill: #94A3B8; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#818CF8" />
+      <stop offset="100%" stop-color="#4F46E5" />
+    </linearGradient>
+  </defs>
+  <!-- The Vertical Pillar -->
+  <rect x="22" y="16" width="18" height="68" rx="9" class="p" />
+  <!-- Top Loop -->
+  <path d="M48 16 h 14 a 16 16 0 0 1 0 32 H 48 V 16 Z" class="s1" />
+  <!-- Bottom Loop -->
+  <path d="M48 56 h 18 a 14 14 0 0 1 0 28 H 48 V 56 Z" class="s2" />
+</svg>

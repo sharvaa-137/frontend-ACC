@@ -10,15 +10,15 @@ useHead({
     { key: 'theme-color', name: 'theme-color', content: color }
   ],
   link: [
-    { rel: 'icon', href: '/favicon.ico' }
+    { rel: 'icon', href: '/logo.svg' }
   ],
   htmlAttrs: {
     lang: 'mn'
   }
 })
 
-const title = 'НЯ-БО Бүртгэл'
-const description = 'Худалдан авалтын гүйлгээний мэдээлэл бүртгэх систем'
+const title = 'Balance'
+const description = 'Finance and transaction management system'
 
 useSeoMeta({
   title,
