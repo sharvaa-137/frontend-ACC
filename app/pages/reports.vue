@@ -117,6 +117,44 @@ const cumulativeChartData = computed(() => {
   }
 })
 
+// Payment status overview chart (Doughnut)
+const paymentStatusChartData = computed(() => {
+  if (!report.value || report.value.transactionCount === 0) return null
+  return {
+    labels: ['Төлсөн', 'Төлөөгүй'],
+    datasets: [{
+      data: [report.value.paidTotal, report.value.unpaidTotal],
+      backgroundColor: ['#16A34A', '#F59E0B'],
+      borderWidth: 0
+    }]
+  }
+})
+
+// Per-company payment status stacked bar chart
+const companyPaymentChartData = computed(() => {
+  if (!report.value || !report.value.groupedByCompany.length) return null
+  const sorted = [...report.value.groupedByCompany].sort((a, b) => b.total - a.total).slice(0, 10)
+  return {
+    labels: sorted.map(c => c.name),
+    datasets: [
+      {
+        label: 'Төлсөн',
+        data: sorted.map(c => c.paidTotal || 0),
+        backgroundColor: '#16A34A',
+        borderRadius: 4,
+        borderSkipped: false
+      },
+      {
+        label: 'Төлөөгүй',
+        data: sorted.map(c => c.unpaidTotal || 0),
+        backgroundColor: '#F59E0B',
+        borderRadius: 4,
+        borderSkipped: false
+      }
+    ]
+  }
+})
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -139,6 +177,41 @@ const chartOptions = computed(() => ({
     x: {
       ticks: { color: colorMode.value === 'dark' ? '#94A3B8' : '#64748B' },
       grid: { display: false }
+    }
+  }
+}))
+
+const stackedBarOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+      labels: {
+        color: colorMode.value === 'dark' ? '#CBD5E1' : '#334155',
+        usePointStyle: true,
+        padding: 16
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: any) => `${ctx.dataset.label}: ${formatMoney(ctx.raw)}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      stacked: true,
+      ticks: { color: colorMode.value === 'dark' ? '#94A3B8' : '#64748B' },
+      grid: { display: false }
+    },
+    y: {
+      stacked: true,
+      ticks: {
+        callback: (value: any) => new Intl.NumberFormat('mn-MN', { notation: 'compact' }).format(value) + '₮',
+        color: colorMode.value === 'dark' ? '#94A3B8' : '#64748B'
+      },
+      grid: { color: colorMode.value === 'dark' ? '#334155' : '#E2E8F0' }
     }
   }
 }))
@@ -184,7 +257,7 @@ const loadReport = async () => {
 
 const exportCSV = () => {
   if (!report.value || !report.value.transactions.length) return
-  const headers = ['№', 'Огноо', 'Цаг', 'Хүлээн авагч', 'Регистр', 'Банк, данс', 'Мөнгөн дүн', 'ХТ']
+  const headers = ['№', 'Огноо', 'Цаг', 'Хүлээн авагч', 'Регистр', 'Банк, данс', 'Мөнгөн дүн', 'ХТ', 'Төлөв']
   const rows = report.value.transactions.map((t: Transaction, i: number) => [
     i + 1,
     formatDate(t.transactionDate),
@@ -193,7 +266,8 @@ const exportCSV = () => {
     t.companyId?.registrationNumber || '',
     t.bankName && t.bankAccount ? `${t.bankName} - ${t.bankAccount}` : '',
     t.amount,
-    t.contactInfo || t.companyId?.contactPerson || ''
+    t.contactInfo || t.companyId?.contactPerson || '',
+    t.paymentStatus === 'paid' ? 'Төлсөн' : 'Төлөөгүй'
   ])
   const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r: any[]) => r.map(v => `"${v}"`).join(','))].join('\n')
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -287,7 +361,7 @@ onMounted(() => loadReport())
 
         <template v-else-if="report">
           <!-- Summary Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div class="rounded-xl border border-default bg-default/50 p-5 space-y-1">
               <div class="text-sm text-muted font-medium flex items-center gap-1.5">
                 <UIcon name="i-lucide-banknote" class="size-4 text-primary" />
@@ -304,22 +378,58 @@ onMounted(() => loadReport())
             </div>
             <div class="rounded-xl border border-default bg-default/50 p-5 space-y-1">
               <div class="text-sm text-muted font-medium flex items-center gap-1.5">
-                <UIcon name="i-lucide-building-2" class="size-4 text-green-500" />
+                <UIcon name="i-lucide-building-2" class="size-4 text-blue-500" />
                 Компаниудын тоо
               </div>
               <p class="text-2xl font-bold">{{ report.groupedByCompany.length }}</p>
             </div>
             <div class="rounded-xl border border-default bg-default/50 p-5 space-y-1">
               <div class="text-sm text-muted font-medium flex items-center gap-1.5">
-                <UIcon name="i-lucide-trending-up" class="size-4 text-amber-500" />
+                <UIcon name="i-lucide-trending-up" class="size-4 text-violet-500" />
                 Дундаж дүн
               </div>
               <p class="text-2xl font-bold">{{ report.transactionCount ? formatMoney(Math.round(report.totalAmount / report.transactionCount)) : '0₮' }}</p>
+            </div>
+            <div class="rounded-xl border border-green-500/30 bg-green-500/5 p-5 space-y-1">
+              <div class="text-sm text-green-600 font-medium flex items-center gap-1.5">
+                <UIcon name="i-lucide-circle-check" class="size-4" />
+                Төлсөн ({{ report.paidCount || 0 }})
+              </div>
+              <p class="text-2xl font-bold text-green-600">{{ formatMoney(report.paidTotal || 0) }}</p>
+            </div>
+            <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-1">
+              <div class="text-sm text-amber-600 font-medium flex items-center gap-1.5">
+                <UIcon name="i-lucide-clock" class="size-4" />
+                Төлөөгүй ({{ report.unpaidCount || 0 }})
+              </div>
+              <p class="text-2xl font-bold text-amber-600">{{ formatMoney(report.unpaidTotal || 0) }}</p>
             </div>
           </div>
 
           <!-- Charts Row -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" v-if="report.transactions.length > 0">
+            <!-- Payment Status Overview (Doughnut) -->
+            <div v-if="paymentStatusChartData" class="rounded-xl border border-default bg-default/50 p-5">
+              <h4 class="font-semibold mb-4 flex items-center gap-2">
+                <UIcon name="i-lucide-pie-chart" class="size-5 text-green-500" />
+                Төлсөн / Төлөөгүй хуваарилалт
+              </h4>
+              <div class="h-64">
+                <Doughnut :data="paymentStatusChartData" :options="doughnutOptions" />
+              </div>
+            </div>
+
+            <!-- Per-Company Payment Status (Stacked Bar) -->
+            <div v-if="companyPaymentChartData" class="rounded-xl border border-default bg-default/50 p-5">
+              <h4 class="font-semibold mb-4 flex items-center gap-2">
+                <UIcon name="i-lucide-bar-chart-3" class="size-5 text-amber-500" />
+                Компаниар төлөв
+              </h4>
+              <div class="h-64">
+                <Bar :data="companyPaymentChartData" :options="stackedBarOptions" />
+              </div>
+            </div>
+
             <!-- Daily Bar Chart -->
             <div v-if="dailyBarChartData" class="rounded-xl border border-default bg-default/50 p-5">
               <h4 class="font-semibold mb-4 flex items-center gap-2">
@@ -345,7 +455,7 @@ onMounted(() => loadReport())
             <!-- Company Distribution Doughnut -->
             <div v-if="companyChartData" class="rounded-xl border border-default bg-default/50 p-5">
               <h4 class="font-semibold mb-4 flex items-center gap-2">
-                <UIcon name="i-lucide-pie-chart" class="size-5 text-green-500" />
+                <UIcon name="i-lucide-pie-chart" class="size-5 text-blue-500" />
                 Компаниар хуваарилалт
               </h4>
               <div class="h-64">
@@ -356,7 +466,7 @@ onMounted(() => loadReport())
             <!-- Company Summary Table -->
             <div v-if="report.groupedByCompany.length > 0" class="rounded-xl border border-default bg-default/50 overflow-hidden">
               <div class="px-5 py-4 border-b border-default flex items-center gap-2">
-                <UIcon name="i-lucide-list" class="size-5 text-amber-500" />
+                <UIcon name="i-lucide-list" class="size-5 text-violet-500" />
                 <h4 class="font-semibold">Компаниар нэгтгэсэн</h4>
               </div>
               <UTable
@@ -365,7 +475,9 @@ onMounted(() => loadReport())
                   { accessorKey: 'index', header: '№' },
                   { accessorKey: 'name', header: 'Компани' },
                   { accessorKey: 'count', header: 'Тоо' },
-                  { accessorKey: 'total', header: 'Нийт дүн' }
+                  { accessorKey: 'total', header: 'Нийт дүн' },
+                  { accessorKey: 'paidTotal', header: 'Төлсөн' },
+                  { accessorKey: 'unpaidTotal', header: 'Төлөөгүй' }
                 ]"
               >
                 <template #index-cell="{ row }">
@@ -373,6 +485,12 @@ onMounted(() => loadReport())
                 </template>
                 <template #total-cell="{ row }">
                   <span class="font-semibold text-primary">{{ formatMoney(row.original.total) }}</span>
+                </template>
+                <template #paidTotal-cell="{ row }">
+                  <span class="font-medium text-green-600">{{ formatMoney(row.original.paidTotal || 0) }}</span>
+                </template>
+                <template #unpaidTotal-cell="{ row }">
+                  <span class="font-medium text-amber-600">{{ formatMoney(row.original.unpaidTotal || 0) }}</span>
                 </template>
               </UTable>
             </div>
@@ -396,7 +514,8 @@ onMounted(() => loadReport())
                 { accessorFn: (row: any) => row.companyId?.registrationNumber || '-', header: 'Регистр', id: 'regNum' },
                 { accessorFn: (row: any) => row.bankName && row.bankAccount ? `${row.bankName} - ${row.bankAccount}` : '-', header: 'Банк, данс', id: 'bankInfo' },
                 { accessorKey: 'amount', header: 'Мөнгөн дүн' },
-                { accessorFn: (row: any) => row.contactInfo || (row.companyId?.contactPerson ? `${row.companyId.contactPerson}${row.companyId.contactInfo ? ' - ' + row.companyId.contactInfo : ''}` : '-'), header: 'ХТ', id: 'contact' }
+                { accessorFn: (row: any) => row.contactInfo || (row.companyId?.contactPerson ? `${row.companyId.contactPerson}${row.companyId.contactInfo ? ' - ' + row.companyId.contactInfo : ''}` : '-'), header: 'ХТ', id: 'contact' },
+                { accessorKey: 'paymentStatus', header: 'Төлөв' }
               ]"
             >
               <template #index-cell="{ row }">
@@ -404,6 +523,17 @@ onMounted(() => loadReport())
               </template>
               <template #amount-cell="{ row }">
                 <span class="font-bold text-primary">{{ formatMoney(row.original.amount) }}</span>
+              </template>
+              <template #paymentStatus-cell="{ row }">
+                <span
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+                  :class="row.original.paymentStatus === 'paid'
+                    ? 'bg-green-500/15 text-green-600'
+                    : 'bg-amber-500/15 text-amber-600'"
+                >
+                  <UIcon :name="row.original.paymentStatus === 'paid' ? 'i-lucide-circle-check' : 'i-lucide-clock'" class="size-3" />
+                  {{ row.original.paymentStatus === 'paid' ? 'Төлсөн' : 'Төлөөгүй' }}
+                </span>
               </template>
             </UTable>
 

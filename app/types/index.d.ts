@@ -22,7 +22,18 @@ export interface Transaction {
   bankAccount: string
   contactInfo: string
   notes: string
+  paymentStatus: 'paid' | 'unpaid'
   createdAt: string
+}
+
+export interface CompanyReportEntry {
+  name: string
+  total: number
+  count: number
+  paidTotal: number
+  unpaidTotal: number
+  paidCount: number
+  unpaidCount: number
 }
 
 export interface ReportData {
@@ -31,9 +42,13 @@ export interface ReportData {
   endDate: string
   totalAmount: number
   transactionCount: number
+  paidTotal: number
+  unpaidTotal: number
+  paidCount: number
+  unpaidCount: number
   transactions: Transaction[]
   groupedByDate: Record<string, { transactions: Transaction[], total: number }>
-  groupedByCompany: { name: string, total: number, count: number }[]
+  groupedByCompany: CompanyReportEntry[]
 }
 
 export type Period = 'daily' | 'weekly' | 'monthly'

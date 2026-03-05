@@ -39,13 +39,24 @@ export const useCompanies = () => {
 
 // Transactions API
 export const useTransactions = () => {
-  const getTransactions = async (date?: string): Promise<Transaction[]> => {
-    const params: Record<string, string> = {}
-    if (date) params.date = date
-    return await $fetch<Transaction[]>(`${getApiBase()}/transactions`, { params })
+  const getTransactions = async (params: { date?: string, year?: number, month?: number } = {}): Promise<Transaction[]> => {
+    const query: Record<string, string> = {}
+    if (params.date) query.date = params.date
+    if (params.year) query.year = String(params.year)
+    if (params.month) query.month = String(params.month)
+    return await $fetch<Transaction[]>(`${getApiBase()}/transactions`, { params: query })
   }
 
-  const createTransaction = async (transaction: { companyId: string, amount: number, transactionDate: string, bankName?: string, bankAccount?: string, contactInfo?: string, notes?: string }): Promise<Transaction> => {
+  const createTransaction = async (transaction: {
+    companyId: string
+    amount: number
+    transactionDate: string
+    bankName?: string
+    bankAccount?: string
+    contactInfo?: string
+    notes?: string
+    paymentStatus?: 'paid' | 'unpaid'
+  }): Promise<Transaction> => {
     return await $fetch<Transaction>(`${getApiBase()}/transactions`, {
       method: 'POST',
       body: transaction
